@@ -1,0 +1,15 @@
+{
+  "name": "McpGuard Lite",
+  "slug": "mcpguard-lite",
+  "preset": "agentsec-mvp",
+  "modules": [
+    "auth.clerk",
+    "db.postgres.prisma",
+    "ai.core",
+    "ai.output-wrapper",
+    "security.analytics",
+    "security.prompt-injection",
+    "mcp.rest"
+  ],
+  "createdAt": "2026-05-24T19:42:24.924Z"
+}
