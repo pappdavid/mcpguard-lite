@@ -35,7 +35,7 @@ export async function GET() {
     events,
     stats: {
       totalScans: total,
-      threatsDetected: unsafe,
+      reportsRequiringReview: unsafe,
       safeScans: total - unsafe,
     },
   });

@@ -20,7 +20,7 @@ model User {
   securityEvents SecurityEvent[]
 }
 
-// Records each MCP prompt scan result
+// Records each MCP tools/list analysis result
 model McpScan {
   id               String   @id @default(cuid())
   userId           String?

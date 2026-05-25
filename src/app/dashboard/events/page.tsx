@@ -34,9 +34,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function EventTypeBadge({ type }: { type: string }) {
   const labels: Record<string, string> = {
-    prompt_injection_detected: "Injection",
-    mcp_scan_completed: "Scan",
-    agent_risk_assessed: "Risk",
+    mcp_scan_completed: "Tools/list",
     auth_failure: "Auth",
   };
   return (
@@ -58,7 +56,7 @@ export default async function EventsPage() {
       <div>
         <h1 className="text-2xl font-bold">Security Events</h1>
         <p className="text-muted-foreground mt-1">
-          Audit trail of your security events across prompt scans and risk assessments.
+          Audit trail for MCP tools/list analyses and service calls.
         </p>
       </div>
 

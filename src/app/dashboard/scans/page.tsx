@@ -43,9 +43,9 @@ export default async function ScansPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Scans</h1>
+        <h1 className="text-2xl font-bold">MCP Tools Analysis</h1>
         <p className="text-muted-foreground mt-1">
-          Run a quick prompt injection scan or browse scan history.
+          Paste MCP tools/list JSON, detect risky capabilities, and review missing controls.
         </p>
       </div>
 
@@ -57,16 +57,16 @@ export default async function ScansPage() {
         </div>
         {scans.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No scans yet. Use the form above to scan your first prompt.
+            No analyses yet. Paste a tools/list JSON response above to create your first report.
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-muted-foreground text-xs">
-                <th className="px-4 py-2 text-left font-medium">Input</th>
+                <th className="px-4 py-2 text-left font-medium">Tools/list preview</th>
                 <th className="px-4 py-2 text-left font-medium">Safe</th>
                 <th className="px-4 py-2 text-left font-medium">Severity</th>
-                <th className="px-4 py-2 text-left font-medium">Patterns</th>
+                <th className="px-4 py-2 text-left font-medium">Findings</th>
                 <th className="px-4 py-2 text-left font-medium">Time</th>
               </tr>
             </thead>
@@ -86,9 +86,9 @@ export default async function ScansPage() {
                   </td>
                   <td className="px-4 py-2">
                     {scan.safe ? (
-                      <span className="text-green-600 font-medium">✓ Safe</span>
+                      <span className="text-green-600 font-medium">Safe</span>
                     ) : (
-                      <span className="text-red-600 font-medium">✗ Flagged</span>
+                      <span className="text-red-600 font-medium">Review</span>
                     )}
                   </td>
                   <td className="px-4 py-2">
@@ -96,7 +96,7 @@ export default async function ScansPage() {
                   </td>
                   <td className="px-4 py-2 text-muted-foreground text-xs">
                     {scan.detectedPatterns.length === 0
-                      ? "—"
+                      ? "-"
                       : scan.detectedPatterns.length}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground text-xs">

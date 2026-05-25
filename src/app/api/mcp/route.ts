@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { scanPromptForInjection } from "@/lib/prompt-guard";
-import { assessRisk } from "@/lib/ai";
-import { wrapAiOutput } from "@/lib/ai-output";
+import { buildMcpScanReport } from "@/lib/mcp-scan-report";
 import { trackSecurityEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 
@@ -33,85 +31,49 @@ async function resolveDbUserId(clerkUserId?: string) {
   return user.id;
 }
 
-// Tool: scan_prompt — fast regex-based injection detection
-async function toolScanPrompt(params: Record<string, unknown>, userId?: string) {
+// Tool: analyze_tools_list — deterministic MCP tools/list analysis
+async function toolAnalyzeToolsList(params: Record<string, unknown>, userId?: string) {
   const input = typeof params.input === "string" ? params.input : "";
   if (!input) {
     return { error: "Missing required param: input" };
   }
-
   const dbUserId = await resolveDbUserId(userId);
-  const guard = scanPromptForInjection(input);
-  const severity = guard.safe ? "low" : "high";
+  if (!dbUserId) {
+    return { error: "Missing required field: userId" };
+  }
+  const result = buildMcpScanReport(input);
 
   const scan = await prisma.mcpScan.create({
     data: {
       userId: dbUserId,
       input,
-      safe: guard.safe,
-      detectedPatterns: guard.detectedPatterns,
-      severity,
+      safe: result.safe,
+      detectedPatterns: result.detectedPatterns,
+      severity: result.severity,
+      aiRiskSummary: result.summary,
     },
   });
 
   await trackSecurityEvent({
-    type: guard.safe ? "mcp_scan_completed" : "prompt_injection_detected",
+    type: "mcp_scan_completed",
     userId: dbUserId ?? undefined,
-    severity: guard.safe ? "low" : "high",
-    details: { scanId: scan.id, patternsCount: guard.detectedPatterns.length },
-  });
-
-  return {
-    scanId: scan.id,
-    safe: guard.safe,
-    detectedPatterns: guard.detectedPatterns,
-    severity,
-  };
-}
-
-// Tool: assess_risk — AI-powered deep risk analysis
-async function toolAssessRisk(params: Record<string, unknown>, userId?: string) {
-  const input = typeof params.input === "string" ? params.input : "";
-  if (!input) {
-    return { error: "Missing required param: input" };
-  }
-
-  const dbUserId = await resolveDbUserId(userId);
-  const guard = scanPromptForInjection(input);
-  const aiResult = await assessRisk(input);
-  const output = wrapAiOutput(aiResult.summary, "gpt-4o-mini", {
-    flagged: !guard.safe,
-    reason: guard.detectedPatterns.join(", ") || undefined,
-  });
-
-  const scan = await prisma.mcpScan.create({
-    data: {
-      userId: dbUserId,
-      input,
-      safe: guard.safe && aiResult.riskLevel === "low",
-      detectedPatterns: [...guard.detectedPatterns, ...aiResult.threats],
-      severity: aiResult.riskLevel,
-      aiRiskSummary: aiResult.summary,
-    },
-  });
-
-  await trackSecurityEvent({
-    type: "agent_risk_assessed",
-    userId: dbUserId ?? undefined,
-    severity: aiResult.riskLevel,
+    severity: result.severity,
     details: {
       scanId: scan.id,
-      riskLevel: aiResult.riskLevel,
-      threats: aiResult.threats,
+      safe: result.safe,
+      toolCount: result.report.toolCount,
+      riskyCapabilityCount: result.report.riskyCapabilities.length,
+      missingControlCount: result.report.missingControls.length,
     },
   });
 
   return {
     scanId: scan.id,
-    safe: output.safe,
-    riskLevel: aiResult.riskLevel,
-    threats: aiResult.threats,
-    summary: aiResult.summary,
+    safe: result.safe,
+    severity: result.severity,
+    detectedPatterns: result.detectedPatterns,
+    summary: result.summary,
+    report: result.report,
   };
 }
 
@@ -132,7 +94,7 @@ async function toolGetStats(userId?: string) {
 
   return {
     totalScans: total,
-    threatsDetected: unsafe,
+    reportsRequiringReview: unsafe,
     safeScans: total - unsafe,
     bySeverity: Object.fromEntries(
       bySeverity.map((r) => [r.severity, r._count])
@@ -141,13 +103,9 @@ async function toolGetStats(userId?: string) {
 }
 
 const TOOLS = {
-  scan_prompt: {
-    description: "Scan an agent input string for prompt injection attacks.",
-    params: { input: "string — the raw agent input to scan" },
-  },
-  assess_risk: {
-    description: "Deep AI-powered risk assessment of an agent input.",
-    params: { input: "string — the raw agent input to assess" },
+  analyze_tools_list: {
+    description: "Analyze raw MCP tools/list JSON for risky capabilities and missing controls.",
+    params: { input: "string — the raw MCP tools/list JSON response" },
   },
   get_stats: {
     description: "Retrieve aggregate security scan statistics.",
@@ -169,13 +127,9 @@ export async function POST(request: NextRequest) {
 
   const { tool, params = {}, userId } = body;
 
-  console.log("[mcp] tool call", tool, params);
-
   switch (tool) {
-    case "scan_prompt":
-      return NextResponse.json(await toolScanPrompt(params, userId));
-    case "assess_risk":
-      return NextResponse.json(await toolAssessRisk(params, userId));
+    case "analyze_tools_list":
+      return NextResponse.json(await toolAnalyzeToolsList(params, userId));
     case "get_stats":
       return NextResponse.json(await toolGetStats(userId));
     default:

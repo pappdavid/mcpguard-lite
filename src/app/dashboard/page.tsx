@@ -62,14 +62,14 @@ export default async function DashboardPage() {
       color: "text-green-500",
     },
     {
-      label: "Threats Detected",
+      label: "Reports Requiring Review",
       value: stats.unsafe,
       icon: ShieldAlert,
       color: "text-red-500",
     },
     {
       label: "Detection Rate",
-      value: stats.total > 0 ? `${Math.round((stats.unsafe / stats.total) * 100)}%` : "—",
+      value: stats.total > 0 ? `${Math.round((stats.unsafe / stats.total) * 100)}%` : "-",
       icon: Activity,
       color: "text-orange-500",
     },
@@ -78,9 +78,9 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Security Overview</h1>
+        <h1 className="text-2xl font-bold">MCP Guard Overview</h1>
         <p className="text-muted-foreground mt-1">
-          Welcome back, {user.firstName ?? user.emailAddresses[0]?.emailAddress}.
+          Tools/list capability reports for {user.firstName ?? user.emailAddresses[0]?.emailAddress}.
         </p>
       </div>
 
@@ -113,17 +113,17 @@ export default async function DashboardPage() {
         </div>
         {stats.recent.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No scans yet. Use the{" "}
+            No tools/list reports yet. Use the{" "}
             <Link href="/dashboard/scans" className="underline">
               Scans
             </Link>{" "}
-            tab or call the MCP API to get started.
+            tab or call the MCP API with analyze_tools_list to get started.
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-muted-foreground text-xs">
-                <th className="px-4 py-2 text-left font-medium">Input (preview)</th>
+                <th className="px-4 py-2 text-left font-medium">Tools/list preview</th>
                 <th className="px-4 py-2 text-left font-medium">Safe</th>
                 <th className="px-4 py-2 text-left font-medium">Severity</th>
                 <th className="px-4 py-2 text-left font-medium">Time</th>
@@ -138,9 +138,9 @@ export default async function DashboardPage() {
                   </td>
                   <td className="px-4 py-2">
                     {scan.safe ? (
-                      <span className="text-green-600 font-medium">✓ Safe</span>
+                      <span className="text-green-600 font-medium">Safe</span>
                     ) : (
-                      <span className="text-red-600 font-medium">✗ Flagged</span>
+                      <span className="text-red-600 font-medium">Review</span>
                     )}
                   </td>
                   <td className="px-4 py-2">

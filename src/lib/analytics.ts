@@ -2,9 +2,7 @@ import { prisma } from "./db";
 import { Prisma } from "@prisma/client";
 
 export type SecurityEventType =
-  | "prompt_injection_detected"
   | "mcp_scan_completed"
-  | "agent_risk_assessed"
   | "auth_failure";
 
 export interface SecurityEvent {
