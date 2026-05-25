@@ -8,8 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
-  const userFilter = user ? { userId: user.id } : {};
+  const user = await prisma.user.upsert({
+    where: { clerkId },
+    update: {},
+    create: { clerkId, email: `${clerkId}@clerk.dev` },
+  });
+  const userFilter = { userId: user.id };
 
   const [scans, events, total, unsafe] = await Promise.all([
     prisma.mcpScan.findMany({

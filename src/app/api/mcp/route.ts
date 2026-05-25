@@ -18,6 +18,21 @@ interface McpToolCall {
   userId?: string;
 }
 
+async function resolveDbUserId(clerkUserId?: string) {
+  if (!clerkUserId) {
+    return null;
+  }
+
+  const user = await prisma.user.upsert({
+    where: { clerkId: clerkUserId },
+    update: {},
+    create: { clerkId: clerkUserId, email: `${clerkUserId}@clerk.dev` },
+    select: { id: true },
+  });
+
+  return user.id;
+}
+
 // Tool: scan_prompt — fast regex-based injection detection
 async function toolScanPrompt(params: Record<string, unknown>, userId?: string) {
   const input = typeof params.input === "string" ? params.input : "";
@@ -25,12 +40,13 @@ async function toolScanPrompt(params: Record<string, unknown>, userId?: string) 
     return { error: "Missing required param: input" };
   }
 
+  const dbUserId = await resolveDbUserId(userId);
   const guard = scanPromptForInjection(input);
   const severity = guard.safe ? "low" : "high";
 
   const scan = await prisma.mcpScan.create({
     data: {
-      userId: userId ?? null,
+      userId: dbUserId,
       input,
       safe: guard.safe,
       detectedPatterns: guard.detectedPatterns,
@@ -40,7 +56,7 @@ async function toolScanPrompt(params: Record<string, unknown>, userId?: string) 
 
   await trackSecurityEvent({
     type: guard.safe ? "mcp_scan_completed" : "prompt_injection_detected",
-    userId,
+    userId: dbUserId ?? undefined,
     severity: guard.safe ? "low" : "high",
     details: { scanId: scan.id, patternsCount: guard.detectedPatterns.length },
   });
@@ -60,6 +76,7 @@ async function toolAssessRisk(params: Record<string, unknown>, userId?: string) 
     return { error: "Missing required param: input" };
   }
 
+  const dbUserId = await resolveDbUserId(userId);
   const guard = scanPromptForInjection(input);
   const aiResult = await assessRisk(input);
   const output = wrapAiOutput(aiResult.summary, "gpt-4o-mini", {
@@ -69,7 +86,7 @@ async function toolAssessRisk(params: Record<string, unknown>, userId?: string) 
 
   const scan = await prisma.mcpScan.create({
     data: {
-      userId: userId ?? null,
+      userId: dbUserId,
       input,
       safe: guard.safe && aiResult.riskLevel === "low",
       detectedPatterns: [...guard.detectedPatterns, ...aiResult.threats],
@@ -80,7 +97,7 @@ async function toolAssessRisk(params: Record<string, unknown>, userId?: string) 
 
   await trackSecurityEvent({
     type: "agent_risk_assessed",
-    userId,
+    userId: dbUserId ?? undefined,
     severity: aiResult.riskLevel,
     details: {
       scanId: scan.id,
@@ -100,7 +117,12 @@ async function toolAssessRisk(params: Record<string, unknown>, userId?: string) 
 
 // Tool: get_stats — aggregate security metrics
 async function toolGetStats(userId?: string) {
-  const where = userId ? { userId } : {};
+  const dbUserId = await resolveDbUserId(userId);
+  if (!dbUserId) {
+    return { error: "Missing required param: userId" };
+  }
+
+  const where = { userId: dbUserId };
 
   const [total, unsafe, bySeverity] = await Promise.all([
     prisma.mcpScan.count({ where }),

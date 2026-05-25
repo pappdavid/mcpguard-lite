@@ -23,8 +23,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required field: input" }, { status: 400 });
   }
 
-  const dbUser = await prisma.user.findUnique({ where: { clerkId } });
-  const userId = dbUser?.id;
+  const dbUser = await prisma.user.upsert({
+    where: { clerkId },
+    update: {},
+    create: { clerkId, email: `${clerkId}@clerk.dev` },
+  });
+  const userId = dbUser.id;
 
   if (tool === "assess_risk") {
     const guard = scanPromptForInjection(input);

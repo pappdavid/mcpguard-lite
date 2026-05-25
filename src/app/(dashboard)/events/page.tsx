@@ -2,8 +2,15 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 
-async function getEvents() {
+async function getEvents(clerkId: string, email: string) {
+  const user = await prisma.user.upsert({
+    where: { clerkId },
+    update: { email },
+    create: { clerkId, email },
+  });
+
   return prisma.securityEvent.findMany({
+    where: { userId: user.id },
     orderBy: { timestamp: "desc" },
     take: 50,
   });
@@ -43,14 +50,15 @@ export default async function EventsPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const events = await getEvents();
+  const email = user.emailAddresses[0]?.emailAddress ?? `${user.id}@clerk.dev`;
+  const events = await getEvents(user.id, email);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Security Events</h1>
         <p className="text-muted-foreground mt-1">
-          Audit trail of all security events across all scans and risk assessments.
+          Audit trail of your security events across prompt scans and risk assessments.
         </p>
       </div>
 

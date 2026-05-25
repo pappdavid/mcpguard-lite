@@ -3,8 +3,15 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import ScanForm from "./scan-form";
 
-async function getAllScans() {
+async function getAllScans(clerkId: string, email: string) {
+  const user = await prisma.user.upsert({
+    where: { clerkId },
+    update: { email },
+    create: { clerkId, email },
+  });
+
   return prisma.mcpScan.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
@@ -30,7 +37,8 @@ export default async function ScansPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const scans = await getAllScans();
+  const email = user.emailAddresses[0]?.emailAddress ?? `${user.id}@clerk.dev`;
+  const scans = await getAllScans(user.id, email);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">

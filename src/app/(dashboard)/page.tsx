@@ -4,11 +4,21 @@ import { prisma } from "@/lib/db";
 import { ShieldAlert, ShieldCheck, ScanLine, Activity } from "lucide-react";
 import Link from "next/link";
 
-async function getStats() {
+async function getStats(clerkId: string, email: string) {
+  const user = await prisma.user.upsert({
+    where: { clerkId },
+    update: { email },
+    create: { clerkId, email },
+  });
+
   const [total, unsafe, recent] = await Promise.all([
-    prisma.mcpScan.count(),
-    prisma.mcpScan.count({ where: { safe: false } }),
-    prisma.mcpScan.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
+    prisma.mcpScan.count({ where: { userId: user.id } }),
+    prisma.mcpScan.count({ where: { userId: user.id, safe: false } }),
+    prisma.mcpScan.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
   ]);
   return { total, unsafe, safe: total - unsafe, recent };
 }
@@ -35,7 +45,8 @@ export default async function DashboardPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const stats = await getStats();
+  const email = user.emailAddresses[0]?.emailAddress ?? `${user.id}@clerk.dev`;
+  const stats = await getStats(user.id, email);
 
   const statCards = [
     {
