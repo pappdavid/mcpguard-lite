@@ -11,7 +11,7 @@ This is **McpGuard Lite**, a SaaS product generated from the `saas-core` factory
 ## Key patterns
 
 - Auth is handled by Clerk (`@clerk/nextjs`). Use `currentUser()` or `auth()` in server components.
-- Database is Prisma + Supabase. Schema lives in `prisma/schema.prisma`.
+- Database is Prisma + Neon Postgres. Schema lives in `prisma/schema.prisma`.
 - AI actions live in `src/lib/ai.ts`. Extend the `runAiAction()` function for product logic.
 - All API routes are in `src/app/api/`.
 - Dashboard pages live in `src/app/(dashboard)/`.

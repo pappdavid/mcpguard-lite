@@ -8,7 +8,7 @@ Lean MCP tools/list risk reporting for AI agents.
 2. Paste a raw MCP `tools/list` JSON response in `/dashboard/scans`.
 3. McpGuard Lite detects risky capability categories such as command execution, filesystem access, network access, secret access, database access, and approval bypass.
 4. The report highlights missing controls such as human approval, audit logging, filesystem sandboxing, and network egress allowlists.
-5. The scan is persisted to Supabase Postgres through Prisma and scoped to the signed-in Clerk user.
+5. The scan is persisted to Neon Postgres through Prisma and scoped to the signed-in Clerk user.
 
 ## One-command local setup
 
@@ -26,7 +26,7 @@ npm run dev           # start dev server on http://localhost:3000
 | Module | Status | Description |
 |--------|--------|-------------|
 | `auth.clerk` | ✅ | Clerk-based auth, sessions, and identity flows |
-| `db.postgres.prisma` | ✅ | PostgreSQL via Prisma ORM with Supabase connection pooling |
+| `db.postgres.prisma` | ✅ | PostgreSQL via Prisma ORM with Neon connection pooling |
 | `tools-list-report` | ✅ | Deterministic MCP tools/list capability and control-gap analysis |
 | `security.analytics` | ✅ | Security event persistence and aggregation |
 | `mcp.rest` | ✅ | REST MCP endpoint — `analyze_tools_list`, `get_stats` |
@@ -102,8 +102,8 @@ npm run build      # production build
 
 ## Deploy
 
-1. Create a Supabase Postgres project.
-2. Set `DATABASE_URL` to the pooled Supabase connection string and `DIRECT_URL` to the direct connection string.
+1. Create a Neon Postgres project.
+2. Set `DATABASE_URL` to the pooled Neon connection string and `DIRECT_URL` to the direct connection string.
 3. Create a Clerk app and set the Clerk publishable/secret keys plus the redirect URLs from `.env.example`.
 4. Generate `MCP_API_SECRET` with `openssl rand -hex 32`.
 5. Install dependencies, generate Prisma, and apply the schema:

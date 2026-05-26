@@ -69,7 +69,7 @@ const capabilityRules: Array<{
   {
     category: "database_access",
     severity: "high",
-    pattern: /\b(sql|database|query|table|postgres|supabase|delete rows?)\b/i,
+    pattern: /\b(sql|database|query|table|postgres|neon|delete rows?)\b/i,
     reason: "Tool can access or mutate database state.",
   },
   {
