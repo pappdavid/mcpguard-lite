@@ -42,7 +42,12 @@ function SeverityBadge({ severity }: { severity: string }) {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const user = await currentUser();
+  let user;
+  try {
+    user = await currentUser();
+  } catch {
+    redirect("/sign-in");
+  }
   if (!user) redirect("/sign-in");
 
   const email = user.emailAddresses[0]?.emailAddress ?? `${user.id}@clerk.dev`;

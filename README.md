@@ -2,6 +2,8 @@
 
 Lean MCP tools/list risk reporting for AI agents.
 
+**Production URL:** https://mcpguard-lite.vercel.app
+
 ## MVP flow
 
 1. Sign in with Clerk.
