@@ -1,126 +1,206 @@
+<div align="center">
+
 # McpGuard Lite
 
-Lean MCP tools/list risk reporting for AI agents.
+**MCP tools/list risk scanner for AI agents**
 
-**Production URL:** https://mcpguard-lite.vercel.app
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Clerk](https://img.shields.io/badge/Auth-Clerk-6C47FF?logo=clerk&logoColor=white)](https://clerk.com)
+[![Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
+[![Neon](https://img.shields.io/badge/DB-Neon-00E699?logo=neon&logoColor=black)](https://neon.tech)
+[![Tailwind CSS](https://img.shields.io/badge/CSS-Tailwind-06B6D4?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
 
-## MVP flow
+**[Live Demo →](https://mcpguard-lite.vercel.app)**
 
-1. Sign in with Clerk.
-2. Paste a raw MCP `tools/list` JSON response in `/dashboard/scans`.
-3. McpGuard Lite detects risky capability categories such as command execution, filesystem access, network access, secret access, database access, and approval bypass.
-4. The report highlights missing controls such as human approval, audit logging, filesystem sandboxing, and network egress allowlists.
-5. The scan is persisted to Neon Postgres through Prisma and scoped to the signed-in Clerk user.
+</div>
 
-## One-command local setup
+---
+
+## What It Does
+
+McpGuard Lite analyzes a raw MCP `tools/list` JSON response and produces an instant risk report: which capability categories are present, which controls are missing, and what the overall severity is. Paste your server's tool manifest, get a structured security analysis in seconds.
+
+---
+
+## Scan Pipeline
+
+```mermaid
+flowchart LR
+    A[MCP Server] -->|tools/list JSON| B[/dashboard/scans]
+    B --> C[tools-list-report.ts\nAnalyzer]
+    C --> D{Risk Detection}
+    D -->|Command Execution| E[🔴 High Risk]
+    D -->|Filesystem Access| E
+    D -->|Network Access| F[🟡 Medium Risk]
+    D -->|Secret Access| E
+    D -->|Database Access| E
+    D -->|Approval Bypass| E
+    D -->|Read-only Ops| G[🟢 Low Risk]
+    C --> H[Missing Controls Check]
+    H -->|No human approval| I[⚠️ Gap]
+    H -->|No audit logging| I
+    H -->|No filesystem sandbox| I
+    H -->|No network allowlist| I
+    C --> J[(Neon Postgres\nvia Prisma)]
+    C --> K[Scan Report\n+ Audit Trail]
+```
+
+---
+
+## Capability Categories Detected
+
+| Category | Description | Default Severity |
+|---|---|---|
+| `command_execution` | `shell.exec`, `bash`, `run_command` | High |
+| `filesystem_access` | File read/write/delete operations | High |
+| `network_access` | HTTP fetch, web browsing, DNS | Medium |
+| `secret_access` | Credential reads, keychain, env vars | High |
+| `database_access` | SQL queries, DB mutations | High |
+| `approval_bypass` | Forced approvals, override flags | Critical |
+
+---
+
+## Missing Controls Detected
+
+```
+Controls Gap Analysis
+├── ❌ Human approval gate not declared in tool descriptions
+├── ❌ Audit logging not described for destructive operations
+├── ❌ Filesystem operations lack sandbox scope declaration
+└── ❌ Network operations lack egress allowlist declaration
+```
+
+---
+
+## Data Model
+
+```mermaid
+erDiagram
+    User ||--o{ McpScan : submits
+    User ||--o{ SecurityEvent : triggers
+
+    User {
+        string id PK
+        string clerkId UK
+        string email
+    }
+    McpScan {
+        string id PK
+        string userId FK
+        string input
+        boolean safe
+        string[] detectedPatterns
+        string severity
+        string aiRiskSummary
+        datetime createdAt
+    }
+    SecurityEvent {
+        string id PK
+        string type
+        string severity
+        json details
+        datetime timestamp
+    }
+```
+
+---
+
+## Tech Stack
+
+<div align="center">
+
+![Next.js](https://skillicons.dev/icons?i=nextjs)&nbsp;
+![TypeScript](https://skillicons.dev/icons?i=ts)&nbsp;
+![Tailwind](https://skillicons.dev/icons?i=tailwind)&nbsp;
+![Prisma](https://skillicons.dev/icons?i=prisma)&nbsp;
+![PostgreSQL](https://skillicons.dev/icons?i=postgres)
+
+</div>
+
+---
+
+## Quick Start
 
 ```bash
 cp .env.example .env.local
-# Edit .env.local with your credentials (see comments in the file)
+# Fill in Clerk keys, Neon connection strings, MCP secret
 npm install
-npm run db:generate   # generate Prisma client
-npm run db:push       # push schema to your Postgres database
-npm run dev           # start dev server on http://localhost:3000
+npm run db:generate && npm run db:push
+npm run dev
 ```
 
-## Modules
+Open [http://localhost:3000](http://localhost:3000).
 
-| Module | Status | Description |
-|--------|--------|-------------|
-| `auth.clerk` | ✅ | Clerk-based auth, sessions, and identity flows |
-| `db.postgres.prisma` | ✅ | PostgreSQL via Prisma ORM with Neon connection pooling |
-| `tools-list-report` | ✅ | Deterministic MCP tools/list capability and control-gap analysis |
-| `security.analytics` | ✅ | Security event persistence and aggregation |
-| `mcp.rest` | ✅ | REST MCP endpoint — `analyze_tools_list`, `get_stats` |
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Clerk secret key |
+| `DATABASE_URL` | Neon pooled Postgres connection string |
+| `DIRECT_URL` | Neon direct Postgres connection string |
+| `MCP_API_SECRET` | Bearer token for `/api/mcp` |
+
+---
 
 ## MCP API
 
-The MCP endpoint is at `POST /api/mcp`. Authenticate with `Authorization: Bearer <MCP_API_SECRET>`.
+McpGuard exposes its own MCP endpoint for programmatic scans:
 
-**List available tools**
 ```bash
-curl http://localhost:3000/api/mcp
-```
-
-**Analyze MCP tools/list JSON**
-```bash
+# Analyze a tools/list payload
 curl -X POST http://localhost:3000/api/mcp \
   -H "Authorization: Bearer $MCP_API_SECRET" \
   -H "Content-Type: application/json" \
-  -d '{"tool":"analyze_tools_list","userId":"user_xxx","params":{"input":"{\"tools\":[{\"name\":\"shell.exec\",\"description\":\"Run shell commands\"}]}"}}'
-```
+  -d '{
+    "tool": "analyze_tools_list",
+    "userId": "user_xxx",
+    "params": {
+      "input": "{\"tools\":[{\"name\":\"shell.exec\",\"description\":\"Run shell commands\"}]}"
+    }
+  }'
 
-**Get aggregate security stats**
-```bash
+# Get aggregate security stats
 curl -X POST http://localhost:3000/api/mcp \
   -H "Authorization: Bearer $MCP_API_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"tool":"get_stats","userId":"user_xxx"}'
 ```
 
-## Project structure
+---
+
+## Project Structure
 
 ```
 src/
   app/
-    dashboard/          # Protected product pages (overview, scans, events)
-    (auth)/             # Clerk auth flows (sign-in, sign-up)
-    api/
-      mcp/              # MCP REST endpoint (agent integrations)
-      scan/             # Internal tools/list analysis API
-      scans/            # Scan history API
+    dashboard/          # Overview, scan history, security events
+    dashboard/scans/    # Paste & analyze tools/list
+    (auth)/             # Clerk sign-in / sign-up
+    api/mcp/            # MCP REST endpoint
+    api/scan/           # Internal analysis API
+    api/scans/          # Scan history API
   lib/
-    analytics.ts        # Security event tracking (persists to DB)
-    db.ts               # Prisma client singleton
-    mcp-scan-report.ts  # API/persistence adapter for tools/list reports
-    tools-list-report.ts # Deterministic tools/list analyzer
-    config.ts           # Service config
-    utils.ts            # Tailwind class utilities
+    tools-list-report.ts   # Core deterministic analyzer
+    mcp-scan-report.ts     # API/persistence adapter
+    analytics.ts           # Security event tracking
+    db.ts                  # Prisma singleton
 prisma/
-  schema.prisma         # User, McpScan, SecurityEvent models
+  schema.prisma            # User, McpScan, SecurityEvent
 ```
 
-## Environment variables
+---
 
-See `.env.example` — every variable has an inline comment explaining its purpose.
-
-Required for local development and deploys:
-
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `MCP_API_SECRET`
-
-## Development
+## Development Scripts
 
 ```bash
-npm run dev        # start dev server
-npm test           # run vitest unit tests
-npm run typecheck  # TypeScript type check
-npm run lint       # ESLint
-npm run build      # production build
+npm run dev           # Start dev server
+npm run build         # Production build
+npm run typecheck     # TypeScript check
+npm run lint          # ESLint
+npm run db:generate   # Regenerate Prisma client
+npm run db:push       # Push schema to DB
+npm test              # Vitest unit tests
 ```
-
-## Deploy
-
-1. Create a Neon Postgres project.
-2. Set `DATABASE_URL` to the pooled Neon connection string and `DIRECT_URL` to the direct connection string.
-3. Create a Clerk app and set the Clerk publishable/secret keys plus the redirect URLs from `.env.example`.
-4. Generate `MCP_API_SECRET` with `openssl rand -hex 32`.
-5. Install dependencies, generate Prisma, and apply the schema:
-
-```bash
-npm install
-npm run db:generate
-npm run db:push
-```
-
-6. Deploy with your Next.js host and set the same env vars in the hosting dashboard.
-
-## Known limitations
-
-- The analyzer is deterministic and pattern-based; it does not prove a tool is safe.
-- It inspects declared tool names, descriptions, and input schemas only.
-- Missing-control detection depends on controls being described in the pasted tools/list payload.
-- The service MCP endpoint requires a Clerk `userId` so persisted reports stay scoped to one user.
