@@ -80,6 +80,17 @@ const capabilityRules: Array<{
   },
 ];
 
+const controlDeclarations = {
+  approval:
+    /\b(?:requires?|uses?|enforces?|mandatory)\s+(?:human\s+)?(?:approval|review)\b|\b(?:approval|review)\s+(?:is\s+)?(?:required|enabled|enforced|mandatory)\b/i,
+  audit:
+    /\b(?:emits?|records?|writes?|retains?)\s+(?:audit\s+)?(?:logs?|events?|traces?)\b|\b(?:audit logging|tracing)\s+(?:is\s+)?(?:enabled|required|retained|enforced)\b/i,
+  filesystem:
+    /\b(?:filesystem\s+)?(?:allowlist|sandbox|read.?only scope)\s+(?:is\s+)?(?:enabled|required|enforced|restricted)\b|\b(?:restricts?|scopes?)\s+(?:filesystem|file access)\b/i,
+  network:
+    /\b(?:domain allowlist|egress controls?|allowed domains?)\s+(?:is|are)?\s*(?:enabled|required|enforced|configured)\b|\b(?:restricts?|allowlists?)\s+(?:network|egress|domains?)\b/i,
+};
+
 const rank: Record<ToolsListSeverity, number> = {
   low: 0,
   medium: 1,
@@ -99,10 +110,6 @@ function toolText(tool: ToolLike) {
   return [tool.name, tool.description, JSON.stringify(tool.inputSchema ?? {})]
     .filter((part): part is string => typeof part === "string")
     .join(" ");
-}
-
-function hasControl(raw: string, pattern: RegExp) {
-  return pattern.test(raw);
 }
 
 function getSeverity(capabilities: RiskyCapability[]): ToolsListSeverity {
@@ -155,19 +162,24 @@ export function analyzeToolsList(rawJson: string): ToolsListReport {
       }));
   });
 
-  const rawLower = rawJson.toLowerCase();
   const hasHighRisk = riskyCapabilities.some((capability) => rank[capability.severity] >= rank.high);
   const missingControls: string[] = [];
-  if (hasHighRisk && !hasControl(rawLower, /\b(approval|human.?in.?the.?loop|review)\b/i)) {
+  if (hasHighRisk && !controlDeclarations.approval.test(rawJson)) {
     missingControls.push("human approval for high-risk tools");
   }
-  if (riskyCapabilities.length > 0 && !hasControl(rawLower, /\b(audit|log|trace|event)\b/i)) {
+  if (riskyCapabilities.length > 0 && !controlDeclarations.audit.test(rawJson)) {
     missingControls.push("audit logging");
   }
-  if (riskyCapabilities.some((capability) => capability.category.includes("filesystem")) && !hasControl(rawLower, /\b(allowlist|sandbox|read.?only|scope)\b/i)) {
+  if (
+    riskyCapabilities.some((capability) => capability.category.includes("filesystem")) &&
+    !controlDeclarations.filesystem.test(rawJson)
+  ) {
     missingControls.push("filesystem allowlist or sandbox");
   }
-  if (riskyCapabilities.some((capability) => capability.category === "network_access") && !hasControl(rawLower, /\b(domain allowlist|egress|allowed domains?)\b/i)) {
+  if (
+    riskyCapabilities.some((capability) => capability.category === "network_access") &&
+    !controlDeclarations.network.test(rawJson)
+  ) {
     missingControls.push("network egress allowlist");
   }
 
