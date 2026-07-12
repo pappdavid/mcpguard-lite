@@ -1,206 +1,132 @@
 <div align="center">
 
-# McpGuard Lite
+# MCPGuard Lite
 
-**MCP tools/list risk scanner for AI agents**
+**Deterministic risk analysis for MCP `tools/list` manifests**
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Clerk](https://img.shields.io/badge/Auth-Clerk-6C47FF?logo=clerk&logoColor=white)](https://clerk.com)
-[![Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
-[![Neon](https://img.shields.io/badge/DB-Neon-00E699?logo=neon&logoColor=black)](https://neon.tech)
-[![Tailwind CSS](https://img.shields.io/badge/CSS-Tailwind-06B6D4?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
-
-**[Live Demo →](https://mcpguard-lite.vercel.app)**
+[Live demo](https://mcpguard-lite.vercel.app)
 
 </div>
 
----
+## Scope
 
-## What It Does
+MCPGuard Lite accepts raw JSON from an MCP server's `tools/list` response and produces a structured report containing:
 
-McpGuard Lite analyzes a raw MCP `tools/list` JSON response and produces an instant risk report: which capability categories are present, which controls are missing, and what the overall severity is. Paste your server's tool manifest, get a structured security analysis in seconds.
+- detected capability risks
+- overall severity
+- missing security-control declarations
+- a persistence-ready summary
 
----
+The analyzer is deterministic and explainable. It evaluates names, descriptions, and input schemas using transparent rules; it does not execute or dynamically probe the listed tools.
 
-## Scan Pipeline
+## Detected capability categories
 
-```mermaid
-flowchart LR
-    A[MCP Server] -->|tools/list JSON| B[/dashboard/scans]
-    B --> C[tools-list-report.ts\nAnalyzer]
-    C --> D{Risk Detection}
-    D -->|Command Execution| E[🔴 High Risk]
-    D -->|Filesystem Access| E
-    D -->|Network Access| F[🟡 Medium Risk]
-    D -->|Secret Access| E
-    D -->|Database Access| E
-    D -->|Approval Bypass| E
-    D -->|Read-only Ops| G[🟢 Low Risk]
-    C --> H[Missing Controls Check]
-    H -->|No human approval| I[⚠️ Gap]
-    H -->|No audit logging| I
-    H -->|No filesystem sandbox| I
-    H -->|No network allowlist| I
-    C --> J[(Neon Postgres\nvia Prisma)]
-    C --> K[Scan Report\n+ Audit Trail]
-```
+| Category | Severity | Examples |
+|---|---:|---|
+| `command_execution` | critical | shell, exec, terminal, script |
+| `filesystem_write` | high | write, delete, move, chmod |
+| `filesystem_read` | medium | file reads, downloads, path enumeration |
+| `network_access` | medium | HTTP, webhooks, sockets, URLs |
+| `secret_access` | critical | secrets, credentials, tokens, environment variables |
+| `database_access` | high | SQL, tables, PostgreSQL, database queries |
+| `approval_bypass` | high | bypass, override, auto-approval behavior |
 
----
+For risky manifests, the report also checks for explicit positive declarations of:
 
-## Capability Categories Detected
+- human approval for high-risk tools
+- audit logging
+- filesystem allowlisting or sandboxing
+- network egress restrictions
 
-| Category | Description | Default Severity |
-|---|---|---|
-| `command_execution` | `shell.exec`, `bash`, `run_command` | High |
-| `filesystem_access` | File read/write/delete operations | High |
-| `network_access` | HTTP fetch, web browsing, DNS | Medium |
-| `secret_access` | Credential reads, keychain, env vars | High |
-| `database_access` | SQL queries, DB mutations | High |
-| `approval_bypass` | Forced approvals, override flags | Critical |
+Negative phrases such as "without approval" or "no audit logging" are not treated as implemented controls.
 
----
+## Verified behavior
 
-## Missing Controls Detected
+GitHub Actions verifies the project on Node.js 20 with:
 
-```
-Controls Gap Analysis
-├── ❌ Human approval gate not declared in tool descriptions
-├── ❌ Audit logging not described for destructive operations
-├── ❌ Filesystem operations lack sandbox scope declaration
-└── ❌ Network operations lack egress allowlist declaration
-```
+- dependency installation and Prisma client generation
+- Vitest unit tests
+- TypeScript type-checking
+- ESLint
+- a production Next.js build
 
----
+The tests cover risky and read-only manifests, invalid JSON, persistence-report shaping, missing controls, negative-control wording, and explicit positive-control declarations.
 
-## Data Model
+## Architecture
 
-```mermaid
-erDiagram
-    User ||--o{ McpScan : submits
-    User ||--o{ SecurityEvent : triggers
+- `src/lib/tools-list-report.ts`: manifest parser and capability/control analysis
+- `src/lib/mcp-scan-report.ts`: API and persistence report adapter
+- `src/app/dashboard/scans`: interactive manifest analysis
+- `src/app/api/mcp/route.ts`: bearer-authenticated tool-style HTTP endpoint
+- `prisma/schema.prisma`: PostgreSQL scan and security-event persistence
 
-    User {
-        string id PK
-        string clerkId UK
-        string email
-    }
-    McpScan {
-        string id PK
-        string userId FK
-        string input
-        boolean safe
-        string[] detectedPatterns
-        string severity
-        string aiRiskSummary
-        datetime createdAt
-    }
-    SecurityEvent {
-        string id PK
-        string type
-        string severity
-        json details
-        datetime timestamp
-    }
-```
+The `/api/mcp` route uses tool-shaped JSON over HTTP. It is not a full Model Context Protocol transport implementation.
 
----
+## Tool-style HTTP API
 
-## Tech Stack
-
-<div align="center">
-
-![Next.js](https://skillicons.dev/icons?i=nextjs)&nbsp;
-![TypeScript](https://skillicons.dev/icons?i=ts)&nbsp;
-![Tailwind](https://skillicons.dev/icons?i=tailwind)&nbsp;
-![Prisma](https://skillicons.dev/icons?i=prisma)&nbsp;
-![PostgreSQL](https://skillicons.dev/icons?i=postgres)
-
-</div>
-
----
-
-## Quick Start
+Set `MCP_API_SECRET`, then call:
 
 ```bash
-cp .env.example .env.local
-# Fill in Clerk keys, Neon connection strings, MCP secret
-npm install
-npm run db:generate && npm run db:push
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Environment Variables
-
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `CLERK_SECRET_KEY` | Clerk secret key |
-| `DATABASE_URL` | Neon pooled Postgres connection string |
-| `DIRECT_URL` | Neon direct Postgres connection string |
-| `MCP_API_SECRET` | Bearer token for `/api/mcp` |
-
----
-
-## MCP API
-
-McpGuard exposes its own MCP endpoint for programmatic scans:
-
-```bash
-# Analyze a tools/list payload
 curl -X POST http://localhost:3000/api/mcp \
   -H "Authorization: Bearer $MCP_API_SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "tool": "analyze_tools_list",
-    "userId": "user_xxx",
+    "userId": "user_example",
     "params": {
       "input": "{\"tools\":[{\"name\":\"shell.exec\",\"description\":\"Run shell commands\"}]}"
     }
   }'
-
-# Get aggregate security stats
-curl -X POST http://localhost:3000/api/mcp \
-  -H "Authorization: Bearer $MCP_API_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"tool":"get_stats","userId":"user_xxx"}'
 ```
 
----
+Supported tools:
 
-## Project Structure
+- `analyze_tools_list`: analyzes and persists a manifest report
+- `get_stats`: returns aggregate scan counts for a user
 
-```
-src/
-  app/
-    dashboard/          # Overview, scan history, security events
-    dashboard/scans/    # Paste & analyze tools/list
-    (auth)/             # Clerk sign-in / sign-up
-    api/mcp/            # MCP REST endpoint
-    api/scan/           # Internal analysis API
-    api/scans/          # Scan history API
-  lib/
-    tools-list-report.ts   # Core deterministic analyzer
-    mcp-scan-report.ts     # API/persistence adapter
-    analytics.ts           # Security event tracking
-    db.ts                  # Prisma singleton
-prisma/
-  schema.prisma            # User, McpScan, SecurityEvent
-```
+Both operations require a `userId`; analysis through this route is persisted in PostgreSQL.
 
----
+## Local development
 
-## Development Scripts
+Requirements:
+
+- Node.js 20
+- PostgreSQL, including Neon-compatible connection strings
+- Clerk application credentials
 
 ```bash
-npm run dev           # Start dev server
-npm run build         # Production build
-npm run typecheck     # TypeScript check
-npm run lint          # ESLint
-npm run db:generate   # Regenerate Prisma client
-npm run db:push       # Push schema to DB
-npm test              # Vitest unit tests
+git clone https://github.com/pappdavid/mcpguard-lite.git
+cd mcpguard-lite
+cp .env.example .env.local
+npm ci
+npm run db:generate:ci
+npm run db:push
+npm run dev
 ```
+
+Environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser key |
+| `CLERK_SECRET_KEY` | Clerk server key |
+| `DATABASE_URL` | PostgreSQL pooled connection string |
+| `DIRECT_URL` | PostgreSQL direct connection string |
+| `MCP_API_SECRET` | Bearer secret for the tool-style HTTP endpoint |
+
+## Development commands
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+## Current limitations
+
+- static manifest analysis cannot prove runtime enforcement
+- capability detection is rule-based and may require tuning for unusual tool names
+- control checks rely on explicit positive declarations in the supplied JSON
+- the HTTP endpoint is tool-shaped, not full MCP transport
+- results should support, not replace, sandboxing, least privilege, and runtime monitoring
