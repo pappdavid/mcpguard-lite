@@ -4,7 +4,7 @@
 
 **Deterministic risk analysis for MCP `tools/list` manifests**
 
-[Live demo](https://mcpguard-lite.vercel.app)
+(hosted demo retired)
 
 </div>
 
